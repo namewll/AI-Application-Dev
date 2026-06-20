@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>小艾- 你的学习助手</title>
+    <style>
+        :root {
+            --primary-color: #ff6b81;
+            --bg-color: #f5f5f5;
+            --chat-bg: #ffffff;
+            --user-bubble: #95ec69;
+            --ai-bubble: #ffffff;
+        }
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: var(--bg-color);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* 顶部导航栏 */
+        .header {
+            background: var(--chat-bg);
+            padding: 10px 15px;
+            display: flex;
+            align-items: center;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            z-index: 10;
+        }
+        .avatar-container {
+            position: relative;
+            width: 45px;
+            height: 45px;
+            margin-right: 12px;
+            cursor: pointer;
+        }
+        .avatar {
+            width: 100%;
+            height: 100%;
+            border-radius: 8px;
+            object-fit: cover;
+            border: 2px solid var(--primary-color);
+        }
+        .change-icon {
+            position: absolute;
+            bottom: -2px;
+            right: -2px;
+            background: var(--primary-color);
+            color: white;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+        }
+        .title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        /* 聊天区域 */
+        .chat-area {
+            flex: 1;
+            overflow-y: auto;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            -webkit-overflow-scrolling: touch;
+        }
+        .message {
+            display: flex;
+            max-width: 85%;
+            gap: 8px;
+        }
+        .message.user {
+            align-self: flex-end;
+            flex-direction: row-reverse;
+        }
+        .message.ai {
+            align-self: flex-start;
+        }
+
+        .msg-avatar {
+            width: 35px;
+            height: 35px;
+            border-radius: 6px;
+            object-fit: cover;
+            flex-shrink: 0;
+        }
+        .bubble {
+            padding: 10px 14px;
+            border-radius: 12px;
+            font-size: 15px;
+            line-height: 1.5;
+            word-wrap: break-word;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+        }
+        .user .bubble {
+            background: var(--user-bubble);
+            color: #000;
+            border-top-right-radius: 2px;
+        }
+        .ai .bubble {
+            background: var(--ai-bubble);
+            color: #333;
+            border-top-left-radius: 2px;
+        }
+
+        /* 底部输入区 */
+        .input-area {
+            background: #f7f7f7;
+            padding: 10px 15px;
+            display: flex;
+            gap: 10px;
+            border-top: 1px solid #ddd;
+            padding-bottom: calc(10px + env(safe-area-inset-bottom));
+        }
+        #user-input {
+            flex: 1;
+            padding: 10px 15px;
+            border: 1px solid #ddd;
+            border-radius: 20px;
+            outline: none;
+            font-size: 15px;
+            background: white;
+        }
+        #send-btn {
+            padding: 0 20px;
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 20px;
+            font-size: 15px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        #send-btn:disabled {
+            background: #ccc;
+        }
+
+        /* 头像切换面板 */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 100;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-overlay.active {
+            display: flex;
+        }
+        .modal-content {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            width: 90%;
+            max-width: 400px;
+            text-align: center;
+        }
+        .modal-title {
+            margin-bottom: 15px;
+            font-size: 18px;
+            font-weight: bold;
+        }
+        .avatar-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+        }
+        .avatar-option {
+            width: 100%;
+            aspect-ratio: 1;
+            border-radius: 10px;
+            object-fit: cover;
+            cursor: pointer;
+            border: 3px solid transparent;
+            transition: all 0.2s;
+        }
+        .avatar-option:hover, .avatar-option.selected {
+            border-color: var(--primary-color);
+            transform: scale(1.05);
+        }
+    </style>
+</head>
+<body>
+    <!-- 顶部导航 -->
+    <div class="header">
+        <div class="avatar-container" id="avatar-trigger">
+            <img src="/avatars/1.jpg" class="avatar" id="current-avatar">
+            <div class="change-icon">✎</div>
+        </div>
+        <div class="title">小艾 (你的学习助手)</div>
+    </div>
+
+    <!-- 聊天区域 -->
+    <div class="chat-area" id="chat-container">
+        <div class="message ai">
+            <img src="/avatars/1.jpg" class="msg-avatar ai-avatar">
+            <div class="bubble">你好呀，你终于来找我啦！今天学习怎么样呀？(๑•ᴗ•๑)</div>
+        </div>
+    </div>
+
+    <!-- 底部输入 -->
+    <div class="input-area">
+        <input type="text" id="user-input" placeholder="跟小艾说点什么..." autocomplete="off">
+        <button id="send-btn">发送</button>
+    </div>
+
+    <!-- 头像切换弹窗 -->
+    <div class="modal-overlay" id="avatar-modal">
+        <div class="modal-content">
+            <div class="modal-title">选择小艾的头像</div>
+            <div class="avatar-grid" id="avatar-grid"></div>
+        </div>
+    </div>
+
+    <script>
+        const chatContainer = document.getElementById('chat-container');
+        const userInput = document.getElementById('user-input');
+        const sendBtn = document.getElementById('send-btn');
+        const currentAvatar = document.getElementById('current-avatar');
+        const aiAvatars = document.querySelectorAll('.ai-avatar');
+        const avatarModal = document.getElementById('avatar-modal');
+        const avatarGrid = document.getElementById('avatar-grid');
+
+        let messages = [];
+        let currentAvatarUrl = "/avatars/1.jpg";
+
+        // 1. 加载头像列表
+        async function loadAvatars() {
+            try {
+                const res = await fetch('/api/avatars');
+                const data = await res.json();
+                avatarGrid.innerHTML = '';
+                data.avatars.forEach(url => {
+                    const img = document.createElement('img');
+                    img.src = url;
+                    img.className = 'avatar-option' + (url === currentAvatarUrl ? ' selected' : '');
+                    img.onclick = () => changeAvatar(url);
+                    avatarGrid.appendChild(img);
+                });
+            } catch (e) {
+                console.error("加载头像失败", e);
+            }
+        }
+
+        // 2. 切换头像逻辑
+        function changeAvatar(url) {
+            currentAvatarUrl = url;
+            currentAvatar.src = url;
+            document.querySelectorAll('.ai-avatar').forEach(img => img.src = url);
+            document.querySelectorAll('.avatar-option').forEach(img => {
+                img.classList.toggle('selected', img.src.endsWith(currentAvatarUrl));
+            });
+            avatarModal.classList.remove('active');
+        }
+
+        document.getElementById('avatar-trigger').onclick = () => avatarModal.classList.add('active');
+        avatarModal.onclick = (e) => { if (e.target === avatarModal) avatarModal.classList.remove('active'); };
+
+        // 3. 新增消息DOM
+        function addMessage(role, text) {
+            const div = document.createElement('div');
+            div.className = `message ${role}`;
+            if (role === 'ai') {
+                div.innerHTML = `<img src="${currentAvatarUrl}" class="msg-avatar ai-avatar"><div class="bubble">${text}</div>`;
+            } else {
+                div.innerHTML = `<div class="bubble">${text}</div>`;
+            }
+            chatContainer.appendChild(div);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+            return div.querySelector('.bubble');
+        }
+
+        // 4. 修复后的聊天请求函数
+        async function sendMessage() {
+            const text = userInput.value.trim();
+            if (!text) return;
+
+            addMessage('user', text);
+            messages.push({ role: "user", content: text });
+            userInput.value = '';
+            sendBtn.disabled = true;
+
+            const aiBubble = addMessage('ai', '思考中...');
+
+            try {
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ messages: messages })
+                });
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder('utf-8');
+                let fullText = '';
+                aiBubble.textContent = '';
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    const chunk = decoder.decode(value, { stream: true });
+                    // SSE标准：双换行分割数据流
+                    const lines = chunk.split('\n\n');
+
+                    for (const line of lines) {
+                        const trimLine = line.trim();
+                        if (!trimLine || !trimLine.startsWith('data:')) continue;
+                        // 关键修复：data: 共5个字符，从下标5截取
+                        const payload = trimLine.substring(5).trim();
+                        if (payload === '[DONE]') continue;
+                        try {
+                            const parsed = JSON.parse(payload);
+                            if (parsed.content) {
+                                fullText += parsed.content;
+                                aiBubble.textContent = fullText;
+                                chatContainer.scrollTop = chatContainer.scrollHeight;
+                            }
+                            if (parsed.error) {
+                                aiBubble.textContent = `出错啦：${parsed.error}`;
+                            }
+                        } catch (parseErr) {
+                            console.error('JSON解析失败', payload, parseErr);
+                        }
+                    }
+                }
+                messages.push({ role: "assistant", content: fullText });
+            } catch (error) {
+                aiBubble.textContent = "网络好像断开了，请你检查一下";
+                console.error('请求异常：', error);
+            } finally {
+                sendBtn.disabled = false;
+                userInput.focus();
+            }
+        }
+
+        sendBtn.addEventListener('click', sendMessage);
+        userInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendMessage(); });
+
+        // 初始化加载头像
+        loadAvatars();
+    </script>
+</body>
+</html>
